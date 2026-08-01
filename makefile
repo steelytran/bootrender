@@ -1,16 +1,14 @@
 AS=nasm
 
-SRCS=\
-main.s \
-
+SRC=main.s
 BIN=bin/boot.img
 
 .PHONY: all clean
-.SUFFIXES: .obj .s
+.SUFFIXES: .s
 
 all: $(BIN)
 
-$(BIN): $(SRCS)
+$(BIN): $(SRC)
 	$(AS) -f bin $< -o $@
 
 clean:

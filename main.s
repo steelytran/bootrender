@@ -128,26 +128,11 @@ section .text
 ; MAIN LOOP
 ;
 loop:
-	cmp word [cs:Player], 319
-	jg .outofbounds
-	cmp word [cs:Player], 0
-	jle .outofbounds
-	cmp word [cs:Player + 2], 199
-	jg .outofbounds
-	cmp word [cs:Player + 2], 0
-	jle .outofbounds
-
-	mov si, [cs:Player + 2]
-	shl si, 1
-	shl si, 1
-	mov cl, 6
-	add si, [cs:Player + 2]
-	shl si, cl
-
-	add si, [cs:Player]
-	mov [ds:si], 0ah
-
-.outofbounds:
+	push 2
+	push 5
+	push [cs:Player]
+	push [cs:Player + 2]
+	call Line
 
 	mov al, [cs:Keystate + K_W]
 	test al, al
@@ -190,8 +175,8 @@ trace_start:
 	in ax, dx
 	test ax, 08h
 	jz trace_start
-; end of vsync
 
+; copy from buffer to display
 	xor si, si
 	xor di, di
 	mov cx, 7d80h
@@ -201,8 +186,9 @@ trace_start:
 	mov ax, ds
 	mov es, ax
 
+; clear buffer
 	xor di, di
-	mov ax, BLACK
+	xor ax, ax
 	mov cx, 7d80h
 	rep stosw
 
@@ -216,14 +202,105 @@ trace_start:
 ;
 	jmp halt
 
-;
-; keyboard IRQ handler
-;
+Pixel:
+	push cx
 
-key_isr:
+	cmp ax, 319
+	jg .outofbounds
+	cmp ax, 0
+	jle .outofbounds
+	cmp bx, 199
+	jg .outofbounds
+	cmp bx, 0
+	jle .outofbounds
+
+	mov si,  bx
+	shl si, 1
+	shl si, 1
+	mov cl, 6
+	add si, bx
+	shl si, cl
+
+	add si, ax
+	mov [ds:si], 0ah
+
+.outofbounds:
+	pop cx
+	ret
+;
+; DDA Line Algorithm
+;
+	; [bp + 4]	y2
+	; [bp + 6]	x2
+	; [bp + 8]	y1
+	; [bp + 10]	x1
+Line:
 	push bp
 	mov bp, sp
 
+DeltaX:
+	mov ax, [bp + 6]
+	sub ax, [bp + 10]
+	jns .positive
+
+	push ax	; [bp - 2] Delta X
+	neg ax
+	jmp DeltaY
+
+.positive:
+	push ax	; [bp - 2] Delta X
+
+DeltaY:
+	mov bx, [bp + 4]
+	sub bx, [bp + 8]
+	jns .positive
+
+	push bx	; [bp - 4] Delta Y
+	neg bx
+	jmp slope
+.positive:
+	push bx	; [bp - 4] Delta Y
+
+slope:
+	cmp bx, ax
+	jg dy_over_dx
+
+	mov cx, bx
+	jmp step
+
+dy_over_dx:
+	mov cx, ax	; length
+
+step:
+	mov ax, [bp - 2]
+	cwd
+	idiv cx
+	push ax	; [bp - 6] x increment
+
+	mov ax, [bp - 4]
+	cwd
+	idiv cx
+	push ax	; [bp - 8] y increment
+
+	mov ax,  [bp + 8]
+	mov bx,  [bp + 10]
+
+draw:
+	 call Pixel
+
+	 add  ax, [bp - 6]
+	 add  bx, [bp - 8]
+
+	loop draw
+
+	mov sp, bp
+	pop bp
+	ret 8
+
+;
+; keyboard IRQ handler
+;
+key_isr:
 	push ax
 	push bx
 	push ds
@@ -252,7 +329,6 @@ key_isr:
 	pop ds
 	pop bx
 	pop ax
-	pop bp
 	iret
 
 halt:
