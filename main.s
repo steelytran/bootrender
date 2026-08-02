@@ -230,10 +230,10 @@ Pixel:
 ;
 ; DDA Line Algorithm
 ;
-	; [bp + 4]	y2
-	; [bp + 6]	x2
-	; [bp + 8]	y1
-	; [bp + 10]	x1
+	;[bp + 4]	y2
+	;[bp + 6]	x2
+	;[bp + 8]	y1
+	;[bp + 10]	x1
 Line:
 	push bp
 	mov bp, sp
@@ -262,14 +262,31 @@ DeltaY:
 	push bx	; [bp - 4] Delta Y
 
 slope:
-	cmp bx, ax
-	jg dy_over_dx
+	cmp bx, ax	;
+	jg dy_over_dx	;if delta_x > delta_y, length = delta_y
+				;else, length = delta_x
+	mov cx, bx	;
+	test cx, cx
+	jz .length_equ_zero
 
-	mov cx, bx
 	jmp step
+
+.length_equ_zero:
+	push 1
+	push 0
+	jmp draw
 
 dy_over_dx:
 	mov cx, ax	; length
+	test cx, cx
+	jz .length_equ_zero
+
+	jmp step
+
+.length_equ_zero:
+	push 0
+	push 1
+	jmp draw
 
 step:
 	mov ax, [bp - 2]
@@ -282,16 +299,17 @@ step:
 	idiv cx
 	push ax	; [bp - 8] y increment
 
-	mov ax,  [bp + 8]
-	mov bx,  [bp + 10]
-
 draw:
-	 call Pixel
+	mov ax,  [bp + 8]	;x1
+	mov bx,  [bp + 10]	;y1
 
-	 add  ax, [bp - 6]
-	 add  bx, [bp - 8]
+.plot:
+	call Pixel
 
-	loop draw
+	add  ax, [bp - 6]
+	add  bx, [bp - 8]
+
+	loop .plot
 
 	mov sp, bp
 	pop bp
