@@ -94,6 +94,8 @@ K_LEFT equ 04Bh
 K_DOWN equ 050h
 K_RIGHT equ 04Dh
 
+VBUF equ 1000h
+
 section .bss
 	Keystate resb 50h
 
@@ -114,8 +116,24 @@ section .text
 	mov word [es:bx + 2], cs
 	sti
 
+; sine approximation
+;sine:
+;	xor ch, ch
+;	mov cx, 180
+;	mov bx, 8100
+;
+;.calc
+;	mov al, 180
+;	sub al, cl
+;	mul cl
+;
+;	xor dx, dx
+;	div bx
+;
+;	loop .calc
+
 ; display buffer
-	mov ax, 1000h
+	mov ax, VBUF
 	mov ds, ax
 
 ; vga mode 13h
@@ -124,6 +142,7 @@ section .text
 
 	mov ax, 0a000h
 	mov es, ax
+
 ;
 ; MAIN LOOP
 ;
@@ -228,7 +247,7 @@ Pixel:
 	pop cx
 	ret
 ;
-; DDA Line Algorithm
+; Line Algorithm
 ;
 	;[bp + 4]	y2
 	;[bp + 6]	x2
@@ -245,71 +264,85 @@ DeltaX:
 
 	push ax	; [bp - 2] Delta X
 	neg ax
+	push -1	; [bp - 4] sign of X
+
 	jmp DeltaY
 
 .positive:
 	push ax	; [bp - 2] Delta X
+	push 1	; [bp - 4] sign of X
 
 DeltaY:
 	mov bx, [bp + 4]
 	sub bx, [bp + 8]
 	jns .positive
 
-	push bx	; [bp - 4] Delta Y
+	push bx	; [bp - 6] Delta Y
 	neg bx
+	push -1	; [bp - 8] sign of Y
+
 	jmp slope
+
 .positive:
-	push bx	; [bp - 4] Delta Y
+	push bx	; [bp - 6] Delta Y
+	push 1	; [bp - 8] sign of Y
 
 slope:
-	cmp bx, ax	;
-	jg dy_over_dx	;if delta_x > delta_y, length = delta_y
-				;else, length = delta_x
-	mov cx, bx	;
-	test cx, cx
-	jz .length_equ_zero
+	push ax	; [bp - 10] unsigned delta X
+	push bx	; [bp - 12] unsigned delta Y
 
-	jmp step
+	cmp ax, bx
+	jl dy_over_dx
 
-.length_equ_zero:
-	push 1
-	push 0
-	jmp draw
+dx_over_dy:
+	mov dx, bx	; py
+	shr dx, 1		;
+
+	mov cx, ax
+
+	mov ax, [bp + 10]
+	mov bx, [bp + 8]
+
+.rep:
+	add dx, [bp - 12]
+	cmp dx, [bp - 10]
+	jl .continue
+
+	sub dx, [bp - 10]
+	add bx, [bp - 8]
+
+.continue:
+
+	add ax, [bp - 4]
+	call Pixel
+	loop .rep
+
+	jmp Line.done
 
 dy_over_dx:
-	mov cx, ax	; length
-	test cx, cx
-	jz .length_equ_zero
+	mov dx, ax	; px
+	shr dx, 1		;
 
-	jmp step
+	mov cx, bx
 
-.length_equ_zero:
-	push 0
-	push 1
-	jmp draw
+	mov ax, [bp + 10]
+	mov bx, [bp + 8]
 
-step:
-	mov ax, [bp - 2]
-	cwd
-	idiv cx
-	push ax	; [bp - 6] x increment
+.rep:
+	add dx, [bp - 10]
+	cmp dx, [bp - 12]
+	jl .continue
 
-	mov ax, [bp - 4]
-	cwd
-	idiv cx
-	push ax	; [bp - 8] y increment
+	sub dx, [bp - 12]
+	add ax, [bp - 4]
 
-draw:
-	mov ax,  [bp + 8]	;x1
-	mov bx,  [bp + 10]	;y1
+.continue:
 
-.plot:
+	add bx, [bp - 8]
 	call Pixel
+	loop .rep
 
-	add  ax, [bp - 6]
-	add  bx, [bp - 8]
-
-	loop .plot
+Line.done:
 
 	mov sp, bp
 	pop bp
