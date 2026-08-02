@@ -134,8 +134,6 @@ sine:
 
 	loop .calc
 
-; display buffer
-
 ; vga mode 13h
 	mov ax, 0013h
 	int 10h
@@ -219,8 +217,12 @@ trace_start:
 ;;
 ;; END OF LOOP
 ;;
+
 	jmp halt
 
+;
+; plot pixel
+;
 Pixel:
 	push cx
 
