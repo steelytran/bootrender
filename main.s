@@ -94,8 +94,6 @@ K_LEFT equ 04Bh
 K_DOWN equ 050h
 K_RIGHT equ 04Dh
 
-VBUF equ 1000h
-
 section .bss
 	Keystate resb 50h
 
@@ -117,24 +115,26 @@ section .text
 	sti
 
 ; sine approximation
-;sine:
-;	xor ch, ch
-;	mov cx, 180
-;	mov bx, 8100
-;
-;.calc
-;	mov al, 180
-;	sub al, cl
-;	mul cl
-;
-;	xor dx, dx
-;	div bx
-;
-;	loop .calc
+sine:
+	mov cx, 180
+     
+	mov ax, 1000h
+	mov ds, ax
+
+	mov bx, 0ffffh
+
+.calc:
+	mov al, 180
+	sub al, cl
+	mul cl
+
+	mov [bx], ax
+	dec bx
+	dec bx
+
+	loop .calc
 
 ; display buffer
-	mov ax, VBUF
-	mov ds, ax
 
 ; vga mode 13h
 	mov ax, 0013h
@@ -143,9 +143,9 @@ section .text
 	mov ax, 0a000h
 	mov es, ax
 
-;
-; MAIN LOOP
-;
+;;
+;; MAIN LOOP
+;;
 loop:
 	push 2
 	push 5
@@ -216,9 +216,9 @@ trace_start:
 	mov al, [cs:Keystate + K_ESC]
 	test al, al
 	jz loop
-;
-; END OF LOOP
-;
+;;
+;; END OF LOOP
+;;
 	jmp halt
 
 Pixel:
@@ -262,41 +262,41 @@ DeltaX:
 	sub ax, [bp + 10]
 	jns .positive
 
-	push ax	; [bp - 2] Delta X
+	push ax	;[bp - 2] Delta X
 	neg ax
-	push -1	; [bp - 4] sign of X
+	push -1	;[bp - 4] sign of X
 
 	jmp DeltaY
 
 .positive:
-	push ax	; [bp - 2] Delta X
-	push 1	; [bp - 4] sign of X
+	push ax		;[bp - 2] Delta X
+	push 1		;[bp - 4] sign of X
 
 DeltaY:
 	mov bx, [bp + 4]
 	sub bx, [bp + 8]
 	jns .positive
 
-	push bx	; [bp - 6] Delta Y
+	push bx	;[bp - 6] Delta Y
 	neg bx
-	push -1	; [bp - 8] sign of Y
+	push -1	;[bp - 8] sign of Y
 
 	jmp slope
 
 .positive:
-	push bx	; [bp - 6] Delta Y
-	push 1	; [bp - 8] sign of Y
+	push bx		;[bp - 6] Delta Y
+	push 1		;[bp - 8] sign of Y
 
 slope:
-	push ax	; [bp - 10] unsigned delta X
-	push bx	; [bp - 12] unsigned delta Y
+	push ax		;[bp - 10] unsigned delta X
+	push bx		;[bp - 12] unsigned delta Y
 
 	cmp ax, bx
 	jl dy_over_dx
 
 dx_over_dy:
-	mov dx, bx	; py
-	shr dx, 1		;
+	mov dx, bx	;py
+	shr dx, 1	;
 
 	mov cx, ax
 
@@ -320,8 +320,8 @@ dx_over_dy:
 	jmp Line.done
 
 dy_over_dx:
-	mov dx, ax	; px
-	shr dx, 1		;
+	mov dx, ax	;px
+	shr dx, 1	;
 
 	mov cx, bx
 
