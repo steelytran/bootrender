@@ -220,8 +220,12 @@ trace_start:
 ;;
 ;; END OF LOOP
 ;;
+
 	jmp halt
 
+;
+; plot pixel
+;
 Pixel:
 	push cx
 
