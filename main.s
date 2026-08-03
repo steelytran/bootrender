@@ -98,8 +98,6 @@ section .bss
 	Keystate resb 50h
 
 section .text
-	Player dw 159, 99
-
 ; stack
 	cli
 	xor ax, ax
@@ -115,13 +113,14 @@ section .text
 	sti
 
 ; sine approximation
+; TODO: write macro for sine and cosine LUT
 sine:
 	mov cx, 180
      
 	mov ax, 1000h
 	mov ds, ax
 
-	mov bx, 0ffffh
+	mov bx, 0fe97h
 
 .calc:
 	mov al, 180
@@ -129,12 +128,14 @@ sine:
 	mul cl
 
 	mov [bx], ax
+
+	neg ax
+	mov [bx + 360], ax
+
 	dec bx
 	dec bx
 
 	loop .calc
-
-; display buffer
 
 ; vga mode 13h
 	mov ax, 0013h
@@ -257,39 +258,39 @@ Line:
 	push bp
 	mov bp, sp
 
-DeltaX:
+delta_x:
 	mov ax, [bp + 6]
 	sub ax, [bp + 10]
 	jns .positive
 
-	push ax	;[bp - 2] Delta X
+	push ax	;[bp - 2] delta x
 	neg ax
-	push -1	;[bp - 4] sign of X
+	push -1	;[bp - 4] sign of x
 
-	jmp DeltaY
+	jmp delta_y
 
 .positive:
-	push ax		;[bp - 2] Delta X
-	push 1		;[bp - 4] sign of X
+	push ax		;[bp - 2] delta x
+	push 1		;[bp - 4] sign of x
 
-DeltaY:
+delta_y:
 	mov bx, [bp + 4]
 	sub bx, [bp + 8]
 	jns .positive
 
-	push bx	;[bp - 6] Delta Y
+	push bx	;[bp - 6] delta y
 	neg bx
-	push -1	;[bp - 8] sign of Y
+	push -1	;[bp - 8] sign of y
 
 	jmp slope
 
 .positive:
-	push bx		;[bp - 6] Delta Y
-	push 1		;[bp - 8] sign of Y
+	push bx		;[bp - 6] delta y
+	push 1		;[bp - 8] sign of y
 
 slope:
-	push ax		;[bp - 10] unsigned delta X
-	push bx		;[bp - 12] unsigned delta Y
+	push ax		;[bp - 10] unsigned delta x
+	push bx		;[bp - 12] unsigned delta y
 
 	cmp ax, bx
 	jl dy_over_dx
@@ -386,6 +387,9 @@ halt:
 	cli
 	hlt
 	jmp halt
+
+; player position
+	Player dw 159, 99
 
 ; boot signature
 times 200h - 2 - ($ - $$) db 0
