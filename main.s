@@ -94,9 +94,6 @@ K_LEFT equ 04Bh
 K_DOWN equ 050h
 K_RIGHT equ 04Dh
 
-section .bss
-	Keystate resb 50h
-
 section .text
 ; stack
 	cli
@@ -116,7 +113,7 @@ section .text
 ; TODO: write macro for sine and cosine LUT
 sine:
 	mov cx, 180
-     
+ 
 	mov ax, 1000h
 	mov ds, ax
 
@@ -144,14 +141,18 @@ sine:
 	mov ax, 0a000h
 	mov es, ax
 
+	mov [cs:Player], 0000h
+	mov [cs:Player + 2], 0000h
+	mov [cs:Player + 4], 0000h
+
+	mov [cs:Linedefs], 100
+	mov [cs:Linedefs + 2], 70
+	mov [cs:Linedefs + 4], 220
+	mov [cs:Linedefs + 6], 130
 ;;
 ;; MAIN LOOP
 ;;
 loop:
-	push 2
-	push 5
-	push [cs:Player]
-	push [cs:Player + 2]
 	call Line
 
 	mov al, [cs:Keystate + K_W]
@@ -182,6 +183,20 @@ loop:
 	inc word [cs:Player]
 
 .not_d:
+	mov al, [cs:Keystate + K_LEFT]
+	test al, al
+	jz .not_left
+
+	dec word [cs:Player + 4]
+
+.not_left:
+	mov al, [cs:Keystate + K_RIGHT]
+	test al, al
+	jz .not_right
+
+	inc word [cs:Player + 4]
+
+.not_right:
 
 ; vsync
 	mov dx, 03dah
@@ -238,7 +253,7 @@ Pixel:
 	cmp bx, 0
 	jle .outofbounds
 
-	mov si,  bx
+	mov si, bx
 	shl si, 1
 	shl si, 1
 	mov cl, 6
@@ -263,8 +278,8 @@ Line:
 	mov bp, sp
 
 delta_x:
-	mov ax, [bp + 6]
-	sub ax, [bp + 10]
+	mov ax, [cs:Linedefs + 4]
+	sub ax, [cs:Linedefs]
 	jns .positive
 
 	push ax	;[bp - 2] delta x
@@ -278,8 +293,8 @@ delta_x:
 	push 1		;[bp - 4] sign of x
 
 delta_y:
-	mov bx, [bp + 4]
-	sub bx, [bp + 8]
+	mov bx, [cs:Linedefs + 6]
+	sub bx, [cs:Linedefs + 2]
 	jns .positive
 
 	push bx	;[bp - 6] delta y
@@ -301,12 +316,18 @@ slope:
 
 dx_over_dy:
 	mov dx, bx	;py
-	shr dx, 1	;
+	shr dx, 1
 
 	mov cx, ax
 
-	mov ax, [bp + 10]
-	mov bx, [bp + 8]
+	mov ax, [cs:Linedefs]
+	mov bx, [cs:Linedefs + 2]
+
+	add ax, [cs:Player]
+	add bx, [cs:Player + 2]
+
+	add ax, 159
+	add bx, 99
 
 .rep:
 	add dx, [bp - 12]
@@ -326,12 +347,18 @@ dx_over_dy:
 
 dy_over_dx:
 	mov dx, ax	;px
-	shr dx, 1	;
+	shr dx, 1
 
 	mov cx, bx
 
-	mov ax, [bp + 10]
-	mov bx, [bp + 8]
+	mov ax, [cs:Linedefs]
+	mov bx, [cs:Linedefs + 2]
+
+	add ax, [cs:Player]
+	add bx, [cs:Player + 2]
+
+	add ax, 159
+	add bx, 99
 
 .rep:
 	add dx, [bp - 10]
@@ -351,7 +378,7 @@ Line.done:
 
 	mov sp, bp
 	pop bp
-	ret 8
+	ret
 
 ;
 ; keyboard IRQ handler
@@ -359,7 +386,6 @@ Line.done:
 key_isr:
 	push ax
 	push bx
-	push ds
 
 	in al, 60h
 	mov ah, al
@@ -382,7 +408,6 @@ key_isr:
 	mov byte [cs:Keystate + bx], 0
 
 .done:
-	pop ds
 	pop bx
 	pop ax
 	iret
@@ -392,9 +417,11 @@ halt:
 	hlt
 	jmp halt
 
-; player position
-	Player dw 159, 99
-
 ; boot signature
 times 200h - 2 - ($ - $$) db 0
 dw 0aa55h
+
+section .bss
+	Keystate resb 50h
+	Player resw 3
+	Linedefs resw 4
