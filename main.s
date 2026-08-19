@@ -225,8 +225,7 @@ halt:
 ;
 ; plot pixel
 ;
-	;[bp + 4]	y
-	;[bp + 6]	x
+
 Pixel:
 	cmp ax, 319
 	jg .outofbounds
