@@ -218,7 +218,6 @@ halt:
 ;
 ; plot pixel
 ;
-
 Pixel:
 	cmp ax, 319
 	jg .outofbounds
@@ -247,28 +246,20 @@ Line:
 delta_x:
 	mov ax, [cs:Linedefs + 4]
 	sub ax, [cs:Linedefs]
-	jns .positive
-
 	push ax	;[bp - 2] delta x
+
+	jns delta_y
+
 	neg ax
-
-	jmp delta_y
-
-.positive:
-	push ax		;[bp - 2] delta x
 
 delta_y:
 	mov bx, [cs:Linedefs + 6]
 	sub bx, [cs:Linedefs + 2]
-	jns .positive
-
 	push bx	;[bp - 4] delta y
+
+	jns step
+
 	neg bx
-
-	jmp step
-
-.positive:
-	push bx		; [bp - 4] delta y
 
 step:
 	cmp ax, bx
