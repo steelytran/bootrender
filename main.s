@@ -107,32 +107,10 @@ section .text
 
 	mov word [es:bx], key_isr
 	mov word [es:bx + 2], cs
+
+	fninit	; initialize x87
+
 	sti
-
-; sine approximation
-; TODO: write macro for sine and cosine LUT
-sine:
-	mov cx, 180
- 
-	mov ax, 1000h
-	mov ds, ax
-
-	mov bx, 0fe97h
-
-.calc:
-	mov al, 180
-	sub al, cl
-	mul cl
-
-	mov [bx], ax
-
-	neg ax
-	mov [bx + 360], ax
-
-	dec bx
-	dec bx
-
-	loop .calc
 
 ; vga mode 13h
 	mov ax, 0013h
@@ -149,6 +127,9 @@ sine:
 	mov [cs:Linedefs + 2], 70
 	mov [cs:Linedefs + 4], 220
 	mov [cs:Linedefs + 6], 130
+
+	mov ax, 1000h
+	mov ds, ax
 ;;
 ;; MAIN LOOP
 ;;
@@ -202,19 +183,19 @@ loop:
 	mov dx, 03dah
 
 trace_end:
-	in ax, dx
-	test ax, 08h
+	in al, dx
+	test al, 08h
 	jnz trace_end
 
 trace_start:
-	in ax, dx
-	test ax, 08h
+	in al, dx
+	test al, 08h
 	jz trace_start
 
 ; copy from buffer to display
 	xor si, si
 	xor di, di
-	mov cx, 7d80h
+	mov cx, 32000
 	rep movsw
 
 	push es
@@ -224,7 +205,7 @@ trace_start:
 ; clear buffer
 	xor di, di
 	xor ax, ax
-	mov cx, 7d80h
+	mov cx, 32000
 	rep stosw
 
 	pop es
@@ -236,43 +217,37 @@ trace_start:
 ;; END OF LOOP
 ;;
 
+halt:
+	cli
+	hlt
 	jmp halt
 
 ;
 ; plot pixel
 ;
+	;[bp + 4]	y
+	;[bp + 6]	x
 Pixel:
-	push cx
-
 	cmp ax, 319
 	jg .outofbounds
 	cmp ax, 0
-	jle .outofbounds
+	jl .outofbounds
 	cmp bx, 199
 	jg .outofbounds
 	cmp bx, 0
-	jle .outofbounds
+	jl .outofbounds
 
 	mov si, bx
-	shl si, 1
-	shl si, 1
-	mov cl, 6
-	add si, bx
-	shl si, cl
+	mul si, 320
 
 	add si, ax
 	mov [ds:si], 0ah
 
 .outofbounds:
-	pop cx
 	ret
 ;
 ; Line Algorithm
 ;
-	;[bp + 4]	y2
-	;[bp + 6]	x2
-	;[bp + 8]	y1
-	;[bp + 10]	x1
 Line:
 	push bp
 	mov bp, sp
@@ -284,97 +259,73 @@ delta_x:
 
 	push ax	;[bp - 2] delta x
 	neg ax
-	push -1	;[bp - 4] sign of x
 
 	jmp delta_y
 
 .positive:
 	push ax		;[bp - 2] delta x
-	push 1		;[bp - 4] sign of x
 
 delta_y:
 	mov bx, [cs:Linedefs + 6]
 	sub bx, [cs:Linedefs + 2]
 	jns .positive
 
-	push bx	;[bp - 6] delta y
+	push bx	;[bp - 4] delta y
 	neg bx
-	push -1	;[bp - 8] sign of y
 
-	jmp slope
+	jmp step
 
 .positive:
-	push bx		;[bp - 6] delta y
-	push 1		;[bp - 8] sign of y
+	push bx		; [bp - 4] delta y
 
-slope:
-	push ax		;[bp - 10] unsigned delta x
-	push bx		;[bp - 12] unsigned delta y
-
+step:
 	cmp ax, bx
-	jl dy_over_dx
+	jl step_y
 
-dx_over_dy:
-	mov dx, bx	;py
-	shr dx, 1
+	push ax		; [bp - 6] step
+	jmp gradient
 
-	mov cx, ax
+step_y:
+	push bx		; [bp - 6] step
 
-	mov ax, [cs:Linedefs]
-	mov bx, [cs:Linedefs + 2]
+gradient:
+	finit
 
-	add ax, [cs:Player]
-	add bx, [cs:Player + 2]
+	fild word [bp - 2]	; st2 dx
+	fild word [bp - 4]	; st1 dy
+	fild word [bp - 6]	; st0 step
 
-	add ax, 159
-	add bx, 99
+	fdiv st1, st0
+	fld st1
+	fiadd word [cs:Player + 2]
 
-.rep:
-	add dx, [bp - 12]
-	cmp dx, [bp - 10]
-	jl .continue
+	fxch st1
+	fdivp st3, st0
+	fld st2
+	fiadd word [cs:Player]
 
-	sub dx, [bp - 10]
-	add bx, [bp - 8]
+	mov cx, [bp - 6]
 
-.continue:
+.draw:
+	; st3 dx
+	; st2 dy
+	; st1 y
+	; st0 x
 
-	add ax, [bp - 4]
+	fist word [bp - 8]
+	fadd st0, st3
+	fxch st1
+
+	fist word [bp - 10]
+	fadd st0, st2
+	fxch st1
+
+	mov ax, [bp - 8]
+	mov bx, [bp - 10]
+
 	call Pixel
-	loop .rep
 
-	jmp Line.done
-
-dy_over_dx:
-	mov dx, ax	;px
-	shr dx, 1
-
-	mov cx, bx
-
-	mov ax, [cs:Linedefs]
-	mov bx, [cs:Linedefs + 2]
-
-	add ax, [cs:Player]
-	add bx, [cs:Player + 2]
-
-	add ax, 159
-	add bx, 99
-
-.rep:
-	add dx, [bp - 10]
-	cmp dx, [bp - 12]
-	jl .continue
-
-	sub dx, [bp - 12]
-	add ax, [bp - 4]
-
-.continue:
-
-	add bx, [bp - 8]
-	call Pixel
-	loop .rep
-
-Line.done:
+	loop .draw
 
 	mov sp, bp
 	pop bp
@@ -411,11 +362,6 @@ key_isr:
 	pop bx
 	pop ax
 	iret
-
-halt:
-	cli
-	hlt
-	jmp halt
 
 ; boot signature
 times 200h - 2 - ($ - $$) db 0
