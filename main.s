@@ -102,11 +102,8 @@ section .text
 	mov sp, 7c00h
 
 ; setup key isr
-	mov es, ax
-	mov bx, (09h * 4)
-
-	mov word [es:bx], key_isr
-	mov word [es:bx + 2], cs
+	mov word [09h * 4], key_isr
+	mov word [09h * 4 + 2], cs
 
 	fninit	; initialize x87
 
@@ -119,14 +116,10 @@ section .text
 	mov ax, 0a000h
 	mov es, ax
 
-	mov [cs:Player], 0000h
-	mov [cs:Player + 2], 0000h
-	mov [cs:Player + 4], 0000h
+	mov [cs:Player], 00000000h
 
-	mov [cs:Linedefs], 100
-	mov [cs:Linedefs + 2], 70
-	mov [cs:Linedefs + 4], 220
-	mov [cs:Linedefs + 6], 130
+	mov dword [cs:Linedefs], 00460064h
+	mov dword [cs:Linedefs + 4], 008200dch
 
 	mov ax, 1000h
 	mov ds, ax
