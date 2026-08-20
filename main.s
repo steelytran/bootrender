@@ -117,6 +117,7 @@ section .text
 	mov es, ax
 
 	mov [cs:Player], 00000000h
+	mov [cs:Player + 4], 0000h
 
 	mov dword [cs:Linedefs], 00460064h
 	mov dword [cs:Linedefs + 4], 008200dch
@@ -131,46 +132,54 @@ loop:
 
 	mov al, [cs:Keystate + K_W]
 	test al, al
-	jz .not_w
+	jz not_w
 
 	dec word [cs:Player + 2]
 
-.not_w:
+not_w:
 	mov al, [cs:Keystate + K_A]
 	test al, al
-	jz .not_a
+	jz not_a
 
 	dec word [cs:Player]
 
-.not_a:
+not_a:
 	mov al, [cs:Keystate + K_S]
 	test al, al
-	jz .not_s
+	jz not_s
 
 	inc word [cs:Player + 2]
 
-.not_s:
+not_s:
 	mov al, [cs:Keystate + K_D]
 	test al, al
-	jz .not_d
+	jz not_d
 
 	inc word [cs:Player]
 
-.not_d:
+not_d:
 	mov al, [cs:Keystate + K_LEFT]
 	test al, al
-	jz .not_left
+	jz not_left
 
 	dec word [cs:Player + 4]
+	jns not_left
 
-.not_left:
+	mov word [cs:Player + 4], 359
+
+not_left:
 	mov al, [cs:Keystate + K_RIGHT]
 	test al, al
-	jz .not_right
+	jz not_right
 
+	mov ax, 360
 	inc word [cs:Player + 4]
+	cmp word [cs:Player + 4], ax
+	jnge not_right
 
-.not_right:
+	mov word [cs:Player + 4], 0
+
+not_right:
 
 ; vsync
 	mov dx, 03dah
