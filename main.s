@@ -128,7 +128,96 @@ section .text
 ;; MAIN LOOP
 ;;
 loop:
-	call Line
+;
+; Line Algorithm
+;
+	push bp
+	mov bp, sp
+
+delta_x:
+	mov ax, [cs:Linedefs + 4]
+	sub ax, [cs:Linedefs]
+	push ax	;[bp - 2] delta x
+
+	jns delta_y
+
+	neg ax
+
+delta_y:
+	mov bx, [cs:Linedefs + 6]
+	sub bx, [cs:Linedefs + 2]
+	push bx	;[bp - 4] delta y
+
+	jns step
+
+	neg bx
+
+step:
+	cmp ax, bx
+	jl step_y
+
+	push ax		; [bp - 6] step
+	jmp gradient
+
+step_y:
+	push bx		; [bp - 6] step
+
+gradient:
+	finit
+
+	fild word [bp - 2]	; st2 dx
+	fild word [bp - 4]	; st1 dy
+	fild word [bp - 6]	; st0 step
+
+	fdiv st1, st0
+	fld st1
+	fiadd word [cs:Player + 2]
+
+	fxch st1
+	fdivp st3, st0
+	fld st2
+	fiadd word [cs:Player]
+
+	mov cx, [bp - 6]
+
+.draw:
+	; st3 dx
+	; st2 dy
+	; st1 y
+	; st0 x
+
+	fist word [bp - 8]
+	fadd st0, st3
+	fxch st1
+
+	fist word [bp - 10]
+	fadd st0, st2
+	fxch st1
+
+	mov ax, [bp - 8]
+	mov bx, [bp - 10]
+
+; draw pixel
+	cmp ax, 319
+	jg .outofbounds
+	cmp ax, 0
+	jl .outofbounds
+	cmp bx, 199
+	jg .outofbounds
+	cmp bx, 0
+	jl .outofbounds
+
+	mov si, bx
+	mul si, 320
+
+	add si, ax
+	mov [ds:si], 0ah
+
+.outofbounds:
+	loop .draw
+
+	mov sp, bp
+	pop bp
 
 	mov al, [cs:Keystate + K_W]
 	test al, al
@@ -223,105 +312,6 @@ halt:
 	cli
 	hlt
 	jmp halt
-
-;
-; plot pixel
-;
-Pixel:
-	cmp ax, 319
-	jg .outofbounds
-	cmp ax, 0
-	jl .outofbounds
-	cmp bx, 199
-	jg .outofbounds
-	cmp bx, 0
-	jl .outofbounds
-
-	mov si, bx
-	mul si, 320
-
-	add si, ax
-	mov [ds:si], 0ah
-
-.outofbounds:
-	ret
-;
-; Line Algorithm
-;
-Line:
-	push bp
-	mov bp, sp
-
-delta_x:
-	mov ax, [cs:Linedefs + 4]
-	sub ax, [cs:Linedefs]
-	push ax	;[bp - 2] delta x
-
-	jns delta_y
-
-	neg ax
-
-delta_y:
-	mov bx, [cs:Linedefs + 6]
-	sub bx, [cs:Linedefs + 2]
-	push bx	;[bp - 4] delta y
-
-	jns step
-
-	neg bx
-
-step:
-	cmp ax, bx
-	jl step_y
-
-	push ax		; [bp - 6] step
-	jmp gradient
-
-step_y:
-	push bx		; [bp - 6] step
-
-gradient:
-	finit
-
-	fild word [bp - 2]	; st2 dx
-	fild word [bp - 4]	; st1 dy
-	fild word [bp - 6]	; st0 step
-
-	fdiv st1, st0
-	fld st1
-	fiadd word [cs:Player + 2]
-
-	fxch st1
-	fdivp st3, st0
-	fld st2
-	fiadd word [cs:Player]
-
-	mov cx, [bp - 6]
-
-.draw:
-	; st3 dx
-	; st2 dy
-	; st1 y
-	; st0 x
-
-	fist word [bp - 8]
-	fadd st0, st3
-	fxch st1
-
-	fist word [bp - 10]
-	fadd st0, st2
-	fxch st1
-
-	mov ax, [bp - 8]
-	mov bx, [bp - 10]
-
-	call Pixel
-
-	loop .draw
-
-	mov sp, bp
-	pop bp
-	ret
 
 ;
 ; keyboard IRQ handler
