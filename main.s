@@ -114,8 +114,6 @@ section .text
 	mov ax, 0a000h
 	mov es, ax
 
-	mov ax, 1000h
-	mov ds, ax
 ;;
 ;; MAIN LOOP
 ;;
@@ -127,13 +125,13 @@ loop:
 	mov bp, sp
 
 	mov cl, 1
-	push [cs:Linedefs]
-	push [cs:Linedefs + 2]
+	push [Linedefs]
+	push [Linedefs + 2]
 
 rotate:
 	fninit
 
-	fild word [cs:Player + 4]
+	fild word [Player + 4]
 	fldpi
 	fmulp st1
 
@@ -144,10 +142,10 @@ rotate:
 	fsincos
 
 	fild word [esp + 2]
-	fisub word [cs:Player + 2]
+	fisub word [Player + 2]
 
 	fild word [esp + 4]
-	fisub word [cs:Player]
+	fisub word [Player]
 
 	fld st1
 	fld st1
@@ -185,12 +183,14 @@ rotate:
 	jcxz delta_x
 	dec cl
 
-	push [cs:Linedefs + 4]; [bp - 6]
-	push [cs:Linedefs + 6]; [bp - 8]
+	push [Linedefs + 4]; [bp - 6]
+	push [Linedefs + 6]; [bp - 8]
 
 	jmp rotate
 
 delta_x:
+	mov ax, 1000h
+	mov ds, ax
 
 	mov ax, [bp - 6]
 	sub ax, [bp - 2]
@@ -276,61 +276,6 @@ gradient:
 .outofbounds:
 	loop .draw
 
-	mov sp, bp
-	pop bp
-
-; player movement
-	mov al, [cs:Keystate + K_W]
-	test al, al
-	jz not_w
-
-	dec word [cs:Player + 2]
-
-not_w:
-	mov al, [cs:Keystate + K_A]
-	test al, al
-	jz not_a
-
-	dec word [cs:Player]
-
-not_a:
-	mov al, [cs:Keystate + K_S]
-	test al, al
-	jz not_s
-
-	inc word [cs:Player + 2]
-
-not_s:
-	mov al, [cs:Keystate + K_D]
-	test al, al
-	jz not_d
-
-	inc word [cs:Player]
-
-not_d:
-	mov al, [cs:Keystate + K_LEFT]
-	test al, al
-	jz not_left
-
-	dec word [cs:Player + 4]
-	jns not_left
-
-	mov word [cs:Player + 4], 359
-
-not_left:
-	mov al, [cs:Keystate + K_RIGHT]
-	test al, al
-	jz not_right
-
-	mov ax, 360
-	inc word [cs:Player + 4]
-	cmp word [cs:Player + 4], ax
-	jnge not_right
-
-	mov word [cs:Player + 4], 0
-
-not_right:
-
 ; vsync
 	mov dx, 03dah
 
@@ -362,7 +307,65 @@ trace_start:
 
 	pop es
 
-	mov al, [cs:Keystate + K_ESC]
+	mov sp, bp
+	pop bp
+
+	xor ax, ax
+	mov ds, ax
+
+; player movement
+	mov al, [Keystate + K_W]
+	test al, al
+	jz not_w
+
+	dec word [Player + 2]
+
+not_w:
+	mov al, [Keystate + K_A]
+	test al, al
+	jz not_a
+
+	dec word [Player]
+
+not_a:
+	mov al, [Keystate + K_S]
+	test al, al
+	jz not_s
+
+	inc word [Player + 2]
+
+not_s:
+	mov al, [Keystate + K_D]
+	test al, al
+	jz not_d
+
+	inc word [Player]
+
+not_d:
+	mov al, [Keystate + K_LEFT]
+	test al, al
+	jz not_left
+
+	dec word [Player + 4]
+	jns not_left
+
+	mov word [Player + 4], 359
+
+not_left:
+	mov al, [Keystate + K_RIGHT]
+	test al, al
+	jz not_right
+
+	mov ax, 360
+	inc word [Player + 4]
+	cmp word [Player + 4], ax
+	jnge not_right
+
+	mov word [Player + 4], 0
+
+not_right:
+
+	mov al, [Keystate + K_ESC]
 	test al, al
 	jz loop
 ;;
