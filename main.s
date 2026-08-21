@@ -114,12 +114,6 @@ section .text
 	mov ax, 0a000h
 	mov es, ax
 
-	mov [cs:Player], 00000000h
-	mov [cs:Player + 4], 0000h
-
-	mov dword [cs:Linedefs], 00460064h
-	mov dword [cs:Linedefs + 4], 008200dch
-
 	mov ax, 1000h
 	mov ds, ax
 ;;
@@ -197,6 +191,7 @@ rotate:
 	jmp rotate
 
 delta_x:
+
 	mov ax, [bp - 6]
 	sub ax, [bp - 2]
 	push ax	;[bp - 10] delta x
@@ -411,11 +406,12 @@ key_isr:
 	pop ax
 	iret
 
+	Player dw 0, 0, 0
+	Linedefs dw 100, 70, 220, 130
+
 ; boot signature
 times 200h - 2 - ($ - $$) db 0
 dw 0aa55h
 
 section .bss
-	Player resw 3
-	Linedefs resw 4
 	Keystate resb 50h
