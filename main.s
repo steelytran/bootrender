@@ -105,8 +105,6 @@ section .text
 	mov word [09h * 4], key_isr
 	mov word [09h * 4 + 2], cs
 
-	fninit	; initialize x87
-
 	sti
 
 ; vga mode 13h
@@ -134,19 +132,83 @@ loop:
 	push bp
 	mov bp, sp
 
+	mov cl, 1
+	push [cs:Linedefs]
+	push [cs:Linedefs + 2]
+
+rotate:
+	fninit
+
+	fild word [cs:Player + 4]
+	fldpi
+	fmulp st1
+
+	push 180
+	fild word [esp]
+	fdivp st1, st0
+
+	fsincos
+
+	fild word [esp + 2]
+	fisub word [cs:Player + 2]
+
+	fild word [esp + 4]
+	fisub word [cs:Player]
+
+	fld st1
+	fld st1
+
+	; st0 x
+	; st1 y
+	; st2 x
+	; st3 y
+	; st4 cos
+	; st5 sin
+
+	; x'
+	fmul st4
+	fxch
+
+	fmul st5
+	fsubp st1
+	fistp word [esp + 4]
+
+	; st0 x
+	; st1 y
+	; st2 cos
+	; st3 sin
+
+	; y'
+	fmul st3
+	fxch
+
+	fmul st2
+	faddp st1
+	fistp word [esp + 2]
+
+	pop ax
+
+	jcxz delta_x
+	dec cl
+
+	push [cs:Linedefs + 4]; [bp - 6]
+	push [cs:Linedefs + 6]; [bp - 8]
+
+	jmp rotate
+
 delta_x:
-	mov ax, [cs:Linedefs + 4]
-	sub ax, [cs:Linedefs]
-	push ax	;[bp - 2] delta x
+	mov ax, [bp - 6]
+	sub ax, [bp - 2]
+	push ax	;[bp - 10] delta x
 
 	jns delta_y
 
 	neg ax
 
 delta_y:
-	mov bx, [cs:Linedefs + 6]
-	sub bx, [cs:Linedefs + 2]
-	push bx	;[bp - 4] delta y
+	mov bx, [bp - 8]
+	sub bx, [bp - 4]
+	push bx	;[bp - 12] delta y
 
 	jns step
 
@@ -156,29 +218,32 @@ step:
 	cmp ax, bx
 	jl step_y
 
-	push ax		; [bp - 6] step
+	push ax		; [bp - 10] step
 	jmp gradient
 
 step_y:
-	push bx		; [bp - 6] step
+	push bx		; [bp - 10] step
 
 gradient:
-	finit
+	fild word [bp - 10]	; dx
+	fild word [bp - 14]	; step
+	fdivp st1, st0
 
-	fild word [bp - 2]	; st2 dx
-	fild word [bp - 4]	; st1 dy
-	fild word [bp - 6]	; st0 step
+	fild word [bp - 12]	; dy
+	fild word [bp - 14]	; step
+	fdivp st1, st0
 
-	fdiv st1, st0
-	fld st1
-	fiadd word [cs:Player + 2]
+	fild word [bp - 4]
+	push 100
+	fiadd word [esp]
+	pop ax
 
-	fxch st1
-	fdivp st3, st0
-	fld st2
-	fiadd word [cs:Player]
+	fild word [bp - 2]
+	push 160
+	fiadd word [esp]
+	pop ax
 
-	mov cx, [bp - 6]
+	mov cx, [bp - 14]
 
 .draw:
 	; st3 dx
@@ -186,16 +251,16 @@ gradient:
 	; st1 y
 	; st0 x
 
-	fist word [bp - 8]
+	fist word [bp - 16]
 	fadd st0, st3
 	fxch st1
 
-	fist word [bp - 10]
+	fist word [bp - 18]
 	fadd st0, st2
 	fxch st1
 
-	mov ax, [bp - 8]
-	mov bx, [bp - 10]
+	mov ax, [bp - 16]
+	mov bx, [bp - 18]
 
 ; draw pixel
 	cmp ax, 319
@@ -219,6 +284,7 @@ gradient:
 	mov sp, bp
 	pop bp
 
+; player movement
 	mov al, [cs:Keystate + K_W]
 	test al, al
 	jz not_w
@@ -350,6 +416,6 @@ times 200h - 2 - ($ - $$) db 0
 dw 0aa55h
 
 section .bss
-	Keystate resb 50h
 	Player resw 3
 	Linedefs resw 4
+	Keystate resb 50h
