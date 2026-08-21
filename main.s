@@ -114,6 +114,9 @@ section .text
 	mov ax, 0a000h
 	mov es, ax
 
+	mov ax, 1000h
+	mov fs, ax
+
 ;;
 ;; MAIN LOOP
 ;;
@@ -121,12 +124,16 @@ loop:
 ;
 ; Line Algorithm
 ;
+	mov si, Linedefs - 4
+line:
 	push bp
 	mov bp, sp
 
+	add si, 4
+
 	mov cl, 1
-	push [Linedefs]
-	push [Linedefs + 2]
+	push [si]
+	push [si + 2]
 
 rotate:
 	fninit
@@ -183,15 +190,12 @@ rotate:
 	jcxz delta_x
 	dec cl
 
-	push [Linedefs + 4]; [bp - 6]
-	push [Linedefs + 6]; [bp - 8]
+	push [si + 4]; [bp - 6]
+	push [si + 6]; [bp - 8]
 
 	jmp rotate
 
 delta_x:
-	mov ax, 1000h
-	mov ds, ax
-
 	mov ax, [bp - 6]
 	sub ax, [bp - 2]
 	push ax	;[bp - 10] delta x
@@ -267,14 +271,20 @@ gradient:
 	cmp bx, 0
 	jl .outofbounds
 
-	mov si, bx
-	mul si, 320
+	mov di, bx
+	mul di, 320
 
-	add si, ax
-	mov [ds:si], 0ah
+	add di, ax
+	mov [fs:di], 0ah
 
 .outofbounds:
 	loop .draw
+
+	mov sp, bp
+	pop bp
+
+	cmp si, Linedefs + 8
+	jb line
 
 ; vsync
 	mov dx, 03dah
@@ -290,13 +300,15 @@ trace_start:
 	jz trace_start
 
 ; copy from buffer to display
+	mov ax, 1000h
+	mov ds, ax
+
 	xor si, si
 	xor di, di
 	mov cx, 32000
 	rep movsw
 
 	push es
-	mov ax, ds
 	mov es, ax
 
 ; clear buffer
@@ -306,9 +318,6 @@ trace_start:
 	rep stosw
 
 	pop es
-
-	mov sp, bp
-	pop bp
 
 	xor ax, ax
 	mov ds, ax
@@ -365,9 +374,10 @@ not_left:
 
 not_right:
 
-	mov al, [Keystate + K_ESC]
-	test al, al
-	jz loop
+;	mov al, [Keystate + K_ESC]
+;	test al, al
+;	jz loop
+	jmp loop
 ;;
 ;; END OF LOOP
 ;;
@@ -410,7 +420,7 @@ key_isr:
 	iret
 
 	Player dw 0, 0, 0
-	Linedefs dw 100, 70, 220, 130
+	Linedefs dw 50, 50, 50, -50, -50, -50, -50, 50
 
 ; boot signature
 times 200h - 2 - ($ - $$) db 0
